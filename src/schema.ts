@@ -16,6 +16,6 @@ builder.queryType({
   fields: (t) => ({ hello: t.string({ resolve: () => "world" }) }),
 });
 
-import "./graphql/user";
+require("./graphql/user");
 
 export const schema = builder.toSchema();

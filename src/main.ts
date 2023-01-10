@@ -2,12 +2,14 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { createServer } from "node:http";
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { createYoga } from "graphql-yoga";
 import { schema } from "./schema";
 import MongoStore from "connect-mongo";
 import session from "express-session";
 import cookieParser from "cookie-parser";
+import compression from "compression";
+import helmet from "helmet";
 import passport from "passport";
 import {
   LocalStrategyVerification,
@@ -15,34 +17,43 @@ import {
 } from "./passport-strategies/passport";
 import { decode, signJwt } from "./utils/jwt.utils";
 import { trim } from "lodash";
+import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
+import { useGraphQlJit } from "@envelop/graphql-jit";
+
 const app = express();
 
-const yoga = (req: Request, res: Response) => {
-  const serverGraphql = createYoga({
-    schema,
-    context: ({ request }) => {
-      const token =
-        req.cookies.token || trim(req.headers.authorization, "Bearer ");
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(compression());
+app.use(helmet());
 
-      const user = req.isAuthenticated() ? decode(token) : null;
+const yoga = createYoga<{ req: Request; res: Response }>({
+  schema,
+  context: ({ request, req, res }) => {
+    const token =
+      req.cookies.token || trim(req.headers.authorization, "Bearer ");
 
-      console.log({ user });
+    const user = req.isAuthenticated() ? decode(token) : null;
 
-      return { request, user };
-    },
-  });
+    console.log({ user });
 
-  return serverGraphql(req, res);
-};
+    return { request, user };
+  },
+  plugins: [
+    useResponseCache({
+      session: (request) => request.headers.get("authorization"),
+    }),
+    useGraphQlJit(),
+  ],
+});
+
+// return serverGraphql(req, res);
 
 const sessionStore = new MongoStore({
   mongoUrl: process.env.DATABASE_URL as string,
   collectionName: "sessions",
 });
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
 
 app.use(
   session({
@@ -98,7 +109,7 @@ app.get(
 );
 
 app.get(
-  "/auth/google",
+  "/auth/sign-in-with-google",
   passport.authenticate("sign-in-with-google", {
     scope: ["profile"],
   })
