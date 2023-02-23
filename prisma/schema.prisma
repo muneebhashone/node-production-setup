@@ -13,7 +13,8 @@ datasource db {
 model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
-  email         String?   @unique
+  email         String   @unique
+  username      String   @unique
   emailVerified DateTime? @map("email_verified")
   image         String?
   gender        Gender?
@@ -25,8 +26,13 @@ model User {
   createdAt     DateTime? @default(now())
   updatedAt     DateTime? @updatedAt
 
+  passwordResetCode String?  @map("password_reset_code")
+  verificationCode  String? @map("verification_code")
+
+
   @@map("users")
 }
+
 
 enum Gender {
   MALE
@@ -37,4 +43,5 @@ enum Gender {
 enum Role {
   ADMIN
   USER
+  VENDOR
 }
